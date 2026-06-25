@@ -1,3 +1,6 @@
+# secrets
+aws-key.json
+sa-key.json
 mlflow.db
 mlartifacts/
 models/

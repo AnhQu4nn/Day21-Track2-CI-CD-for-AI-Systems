@@ -5,10 +5,48 @@ import yaml
 import json
 import joblib
 import os
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 
 EVAL_THRESHOLD = 0.70
+
+MODEL_TYPES = {
+    "random_forest": RandomForestClassifier,
+    "extra_trees": ExtraTreesClassifier,
+}
+
+
+def _mlflow_params(params: dict) -> dict:
+    return {
+        key: json.dumps(value) if isinstance(value, (dict, list)) else value
+        for key, value in params.items()
+    }
+
+
+def _load_train_data(data_path: str, extra_data_paths: list[str]) -> pd.DataFrame:
+    dataframes = [pd.read_csv(data_path)]
+
+    for path in extra_data_paths:
+        dataframes.append(pd.read_csv(path))
+
+    return pd.concat(dataframes, ignore_index=True)
+
+
+def _build_model(params: dict):
+    model_type = params.get("model_type", "random_forest")
+
+    if model_type not in MODEL_TYPES:
+        supported = ", ".join(sorted(MODEL_TYPES))
+        raise ValueError(f"Unsupported model_type '{model_type}'. Supported: {supported}")
+
+    model_params = {
+        key: value
+        for key, value in params.items()
+        if key not in {"model_type", "extra_data_paths"}
+    }
+    model_params.setdefault("random_state", 42)
+
+    return MODEL_TYPES[model_type](**model_params)
 
 
 def train(
@@ -19,9 +57,12 @@ def train(
     """
     Huan luyen mo hinh va ghi nhan ket qua vao MLflow.
     """
+    mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
+    mlflow.set_experiment(os.environ.get("MLFLOW_EXPERIMENT_NAME", "Default"))
 
     # TODO 1: Doc du lieu huan luyen va danh gia
-    df_train = pd.read_csv(data_path)
+    extra_data_paths = params.get("extra_data_paths", [])
+    df_train = _load_train_data(data_path, extra_data_paths)
     df_eval = pd.read_csv(eval_path)
 
     # TODO 2: Tach dac trung (X) va nhan (y)
@@ -34,15 +75,11 @@ def train(
     with mlflow.start_run():
 
         # TODO 3: Ghi nhan cac sieu tham so
-        mlflow.log_params(params)
+        mlflow.log_params(_mlflow_params(params))
+        mlflow.log_param("train_rows", len(df_train))
 
-        # TODO 4: Khoi tao va huan luyen RandomForestClassifier
-        model_params = {
-            **params,
-            "random_state": params.get("random_state", 42),
-        }
-
-        model = RandomForestClassifier(**model_params)
+        # TODO 4: Khoi tao va huan luyen mo hinh
+        model = _build_model(params)
         model.fit(X_train, y_train)
 
         # TODO 5: Du doan tren tap danh gia va tinh chi so

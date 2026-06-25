@@ -133,21 +133,21 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
-        script: |
-          sudo systemctl daemon-reload
-          sudo systemctl restart mlops-serve
+          script: |
+            sudo systemctl daemon-reload
+            sudo systemctl restart mlops-serve
 
-          for i in {1..20}; do
-            if curl -f http://127.0.0.1:8000/health; then
-              echo "Service is healthy"
-              exit 0
-            fi
+            for i in {1..20}; do
+              if curl -f http://127.0.0.1:8000/health; then
+                echo "Service is healthy"
+                exit 0
+              fi
 
-            echo "Waiting for service..."
-            sleep 5
-          done
+              echo "Waiting for service..."
+              sleep 5
+            done
 
-          sudo systemctl status mlops-serve --no-pager || true
-          sudo journalctl -u mlops-serve -n 100 --no-pager || true
-          echo "Service health check failed"
-          exit 1
+            sudo systemctl status mlops-serve --no-pager || true
+            sudo journalctl -u mlops-serve -n 100 --no-pager || true
+            echo "Service health check failed"
+            exit 1
